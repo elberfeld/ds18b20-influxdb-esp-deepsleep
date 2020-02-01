@@ -1,28 +1,10 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
-
-// Data wire is plugged into port 2 on the Arduino
-#define ONE_WIRE_BUS D6
-
-// 9 bits: increments of 0.5C, 93.75ms to measure temperature;
-// 10 bits: increments of 0.25C, 187.5ms to measure temperature;
-// 11 bits: increments of 0.125C, 375ms to measure temperature;
-// 12 bits: increments of 0.0625C, 750ms to measure temperature.
-#define SENSOR_RESOLUTION 12
-
-// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-OneWire oneWire(ONE_WIRE_BUS);
-
-// Pass our oneWire reference to Dallas Temperature. 
-DallasTemperature sensors(&oneWire);
-DeviceAddress sensorDeviceAddress;
-
-
-
-
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
 #include <InfluxDb.h>
+
+// -------- Settings --------
 
 #define INFLUXDB_HOST ""
 #define INFLUXDB_DB ""
@@ -35,10 +17,69 @@ DeviceAddress sensorDeviceAddress;
 
 uint32_t sleep_time = 300; //in s
 
+// --------  --------
 
+// Data wire is plugged into port 2 on the Arduino
+#define ONE_WIRE_BUS D6
+
+// 9 bits: increments of 0.5C, 93.75ms to measure temperature;
+// 10 bits: increments of 0.25C, 187.5ms to measure temperature;
+// 11 bits: increments of 0.125C, 375ms to measure temperature;
+// 12 bits: increments of 0.0625C, 750ms to measure temperature.
+#define SENSOR_RESOLUTION 12
+
+
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+
+// Pass our oneWire reference to Dallas Temperature. 
+DallasTemperature sensors(&oneWire);
+DeviceAddress sensorDeviceAddress;
 
 ESP8266WiFiMulti WiFiMulti;
 Influxdb influx(INFLUXDB_HOST);
+
+void wifi_connect(){
+	Serial.print("WLAN: connecting to \"" + (String)WIFI_SSID + "\"");
+	WiFi.begin(WIFI_SSID, WIFI_PASS);
+
+	uint16_t tries=0;
+	while (tries < 30 && WiFi.status() != WL_CONNECTED) {
+		delay(500);
+		Serial.print('.');
+		tries++;
+	}
+	
+	Serial.println("");
+	
+	if(WiFi.status() != WL_CONNECTED){
+		Serial.println("WLAN: Fehler: keine WLAN Verbindung moeglich");
+	}else{
+		Serial.print("WLAN: connected, IP address: ");
+		Serial.println(WiFi.localIP());
+	}
+}
+
+void wifi_disconnect(){
+	Serial.println("WLAN: disconnected");
+	WiFi.disconnect();
+}
+
+void go_to_sleep(uint32_t seconds){
+	wifi_disconnect();
+	if(seconds == 0){
+		Serial.println("Going to Sleep FOREVER!!!");
+	}else{
+		Serial.println("Going to Sleep for " + (String)seconds + 's');
+	}
+	Serial.println("");
+	//`ESP.deepSleep(microseconds, mode)` will put the chip into deep sleep. `mode` is one of `WAKE_RF_DEFAULT`, `WAKE_RFCAL`, `WAKE_NO_RFCAL`, `WAKE_RF_DISABLED`. (GPIO16 needs to be tied to RST to wake from deepSleep.)
+	// digitalWrite(ESP_LED_PIN, HIGH); //statusled aus
+	ESP.deepSleep(seconds*1000000, WAKE_RF_DEFAULT);
+	//delay(seconds*1000);
+}
+
+
 
 void setup() {
 	pinMode(ESP_LED_PIN, OUTPUT);
@@ -102,42 +143,3 @@ void loop() {
 
 }
 
-void go_to_sleep(uint32_t seconds){
-	wifi_disconnect();
-	if(seconds == 0){
-		Serial.println("Going to Sleep FOREVER!!!");
-	}else{
-		Serial.println("Going to Sleep for " + (String)seconds + 's');
-	}
-	Serial.println("");
-	//`ESP.deepSleep(microseconds, mode)` will put the chip into deep sleep. `mode` is one of `WAKE_RF_DEFAULT`, `WAKE_RFCAL`, `WAKE_NO_RFCAL`, `WAKE_RF_DISABLED`. (GPIO16 needs to be tied to RST to wake from deepSleep.)
-	// digitalWrite(ESP_LED_PIN, HIGH); //statusled aus
-	ESP.deepSleep(seconds*1000000, WAKE_RF_DEFAULT);
-	//delay(seconds*1000);
-}
-
-void wifi_connect(){
-	Serial.print("WLAN: connecting to \"" + (String)WIFI_SSID + "\"");
-	WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-	uint16_t tries=0;
-	while (tries < 30 && WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		Serial.print('.');
-		tries++;
-	}
-	
-	Serial.println("");
-	
-	if(WiFi.status() != WL_CONNECTED){
-		Serial.println("WLAN: Fehler: keine WLAN Verbindung moeglich");
-	}else{
-		Serial.print("WLAN: connected, IP address: ");
-		Serial.println(WiFi.localIP());
-	}
-}
-
-void wifi_disconnect(){
-	Serial.println("WLAN: disconnected");
-	WiFi.disconnect();
-}
