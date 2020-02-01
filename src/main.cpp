@@ -13,14 +13,13 @@
 #define WIFI_SSID ""
 #define WIFI_PASS ""
 
-#define ESP_LED_PIN D4 //An solange aktiv, low=an
+#define ESP_LED_PIN D4 // Status LED of wemos d1 mini lite board, An solange aktiv, low=an
 
-uint32_t sleep_time = 300; //in s
+#define ONE_WIRE_BUS D6 // Data pin of ds18b20
+
+uint32_t sleep_time = 300; //in s, 470R zwischen D0 und RST!
 
 // --------  --------
-
-// Data wire is plugged into port 2 on the Arduino
-#define ONE_WIRE_BUS D6
 
 // 9 bits: increments of 0.5C, 93.75ms to measure temperature;
 // 10 bits: increments of 0.25C, 187.5ms to measure temperature;
