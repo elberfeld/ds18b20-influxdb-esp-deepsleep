@@ -6,18 +6,24 @@
 
 // -------- Settings --------
 
-#define INFLUXDB_HOST ""
-#define INFLUXDB_DB ""
-#define INFLUXDB_USER ""
-#define INFLUXDB_PASS ""
 #define WIFI_SSID ""
 #define WIFI_PASS ""
 
-#define ESP_LED_PIN D4 // Status LED of wemos d1 mini lite board, An solange aktiv, low=an
+#define INFLUXDB_HOST ""
+#define INFLUXDB_PORT "8086"
+#define INFLUXDB_DB ""
+#define INFLUXDB_USER ""
+#define INFLUXDB_PASS ""
 
-#define ONE_WIRE_BUS D6 // Data pin of ds18b20
+#define ESP_LED_PIN D4  // Status LED of wemos d1 mini lite board, An solange aktiv, low=an
 
-uint32_t sleep_time = 300; //in s, 470R zwischen D0 und RST!
+#define ONE_WIRE_BUS D4  // Data pin of ds18b20
+
+uint32_t sleep_time = 10;  //in s, 470R zwischen D0 und RST!
+
+#define DS18B20_POWERPIN D2  // io as vcc, comment out to disable, use 100n cap on sensor when doing this!
+
+// also see "influxdb measurement and tags" in setup()
 
 // --------  --------
 
@@ -83,20 +89,16 @@ void go_to_sleep(uint32_t seconds){
 void setup() {
 	pinMode(ESP_LED_PIN, OUTPUT);
 	digitalWrite(ESP_LED_PIN, LOW); //statusled an
-	
+
+	#ifdef DS18B20_POWERPIN
+	pinMode(DS18B20_POWERPIN, OUTPUT);
+	digitalWrite(DS18B20_POWERPIN, HIGH); //artificial vcc
+	#endif
+
 	Serial.begin(9600);
+	Serial.println("");
 	Serial.println("### Start ###");
 	
-	Serial.println("Init Sensor...");
-	pinMode(D5, OUTPUT);  // gnd for sensor
-	digitalWrite(D5, LOW);
-	pinMode(D7, OUTPUT);  // vcc for sensor
-	digitalWrite(D7, HIGH);
-	delay(100);
-	sensors.begin();
-	sensors.getAddress(sensorDeviceAddress, 0);
-	sensors.setResolution(sensorDeviceAddress, SENSOR_RESOLUTION);
-
   	if(WiFi.status() != WL_CONNECTED)wifi_connect();
 	if(WiFi.status() != WL_CONNECTED)wifi_connect();
 	if(WiFi.status() != WL_CONNECTED)wifi_connect();
@@ -107,38 +109,37 @@ void setup() {
 		go_to_sleep(300); //0=forever
 	}
 
+
+	Serial.println("Init Sensor...");
+	delay(100);
+	sensors.begin();
+	sensors.getAddress(sensorDeviceAddress, 0);
+	sensors.setResolution(sensorDeviceAddress, SENSOR_RESOLUTION);
+
+	Serial.print("Requesting temperatures...");
+	sensors.requestTemperatures(); // Send the command to get temperatures
+	float temp = sensors.getTempCByIndex(0);
+	Serial.println(" DONE");
+	Serial.print("Temperature for the device 1 (index 0) is: ");
+	Serial.println(temp);  
+
+
 	influx.setDbAuth(INFLUXDB_DB, INFLUXDB_USER, INFLUXDB_PASS);
 
-	Serial.println("Setup done");
+	// -------- influxdb measurement and tags --------
+	
+	InfluxData row("temperatur");  // measurement (table)
+	row.addTag("standort", "test");
+	row.addTag("board", "esp8266");
+	row.addTag("sensor", "ds18b20");
+	row.addValue("temperatur", temp);
+
+	// -------- influxdb --------
+
+	influx.write(row);
+
+	// delay(sleep_time);
+	go_to_sleep(sleep_time); //0=forever
 }
 
-
-int loopCount = 0;
-
-void loop() {
-  // loopCount++;
-  
-  Serial.print("Requesting temperatures...");
-  sensors.requestTemperatures(); // Send the command to get temperatures
-  float temp = sensors.getTempCByIndex(0);
-  // float temp = 15.0;
-  Serial.println("DONE");
-  // After we got the temperatures, we can print them here.
-  // We use the function ByIndex, and as an example get the temperature from the first sensor only.
-  Serial.print("Temperature for the device 1 (index 0) is: ");
-  Serial.println(temp);  
-
-  InfluxData row("temperatur");
-  row.addTag("kunde", "ff");
-  row.addTag("standort", "bueroms");
-  row.addTag("art", "iot-temperatur");
-  row.addTag("objektname", "chefetage1");
-  row.addValue("temperatur", temp);
-
-  influx.write(row);
-
-  // delay(sleep_time);
-  go_to_sleep(sleep_time); //0=forever
-
-}
-
+void loop() {}
