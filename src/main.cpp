@@ -2,30 +2,29 @@
 #include <DallasTemperature.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
-#include <InfluxDb.h>
+#include <Ethernet.h>
+#include <PubSubClient.h>
 
 // -------- Settings --------
 
 #define WIFI_SSID ""
 #define WIFI_PASS ""
 
-#define INFLUXDB_HOST ""
-#define INFLUXDB_PORT "8086"
-#define INFLUXDB_DB ""
-#define INFLUXDB_USER ""
-#define INFLUXDB_PASS ""
+#define MQTT_HOST ""
+#define MQTT_PORT 1883
+#define MQTT_ID ""
+#define MQTT_TOPIC "temp"
+
+uint32_t sleep_time = 30;  //in s
+
+// -------- Settings --------
 
 #define ESP_LED_PIN D4  // Status LED of wemos d1 mini lite board, An solange aktiv, low=an
 
 #define ONE_WIRE_BUS D4  // Data pin of ds18b20
 
-uint32_t sleep_time = 10;  //in s, 470R zwischen D0 und RST!
-
 #define DS18B20_POWERPIN D2  // io as vcc, comment out to disable, use 100n cap on sensor when doing this!
 
-// also see "influxdb measurement and tags" in setup()
-
-// --------  --------
 
 // 9 bits: increments of 0.5C, 93.75ms to measure temperature;
 // 10 bits: increments of 0.25C, 187.5ms to measure temperature;
@@ -42,7 +41,9 @@ DallasTemperature sensors(&oneWire);
 DeviceAddress sensorDeviceAddress;
 
 ESP8266WiFiMulti WiFiMulti;
-Influxdb influx(INFLUXDB_HOST);
+WiFiClient wifiClient;
+PubSubClient mqttClient(MQTT_HOST, MQTT_PORT, wifiClient);
+
 
 void wifi_connect(){
 	Serial.print("WLAN: connecting to \"" + (String)WIFI_SSID + "\"");
@@ -123,20 +124,34 @@ void setup() {
 	Serial.print("Temperature for the device 1 (index 0) is: ");
 	Serial.println(temp);  
 
+    char topic[strlen(MQTT_TOPIC) + strlen(MQTT_ID) + 2];
+    sprintf(topic, "%s/%s", MQTT_TOPIC, MQTT_ID);
 
-	influx.setDbAuth(INFLUXDB_DB, INFLUXDB_USER, INFLUXDB_PASS);
+    char payload[10]; 
+    sprintf(payload, "%2.2f", temp);
 
-	// -------- influxdb measurement and tags --------
-	
-	InfluxData row("temperatur");  // measurement (table)
-	row.addTag("standort", "test");
-	row.addTag("board", "esp8266");
-	row.addTag("sensor", "ds18b20");
-	row.addValue("temperatur", temp);
+    Serial.print("MQTT Topic: ");
+    Serial.print(topic);
+    Serial.print(" :: Payload: ");
+    Serial.print(payload);
+    Serial.println();
 
-	// -------- influxdb --------
+	if (mqttClient.connect(MQTT_ID)) {
+		Serial.println("MQTT connected");
+	} else {
+		Serial.println("MQTT connect failed");
+		Serial.println(mqttClient.state());
+	}
 
-	influx.write(row);
+	if (mqttClient.publish(topic, payload)) {
+		Serial.println("MQTT published");
+	} else {
+		Serial.println("MQTT publish failed, state="+mqttClient.state());
+		Serial.println(mqttClient.state());
+	}	
+
+	mqttClient.disconnect();
+	Serial.println("MQTT disconnected");
 
 	// delay(sleep_time);
 	go_to_sleep(sleep_time); //0=forever
