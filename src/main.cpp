@@ -4,18 +4,7 @@
 #include <ESP8266WiFiMulti.h>
 #include <Ethernet.h>
 #include <PubSubClient.h>
-
-// -------- Settings --------
-
-#define WIFI_SSID ""
-#define WIFI_PASS ""
-
-#define MQTT_HOST ""
-#define MQTT_PORT 1883
-#define MQTT_ID ""
-#define MQTT_TOPIC "temp"
-
-uint32_t sleep_time = 30;  //in s
+#include <../settings.h>
 
 // -------- Settings --------
 
@@ -154,7 +143,7 @@ void setup() {
 	Serial.println("MQTT disconnected");
 
 	// delay(sleep_time);
-	go_to_sleep(sleep_time); //0=forever
+	go_to_sleep(SLEEP_TIME); //0=forever
 }
 
 void loop() {}
